@@ -1,0 +1,5 @@
+﻿Test paper title here
+Body cites source [1] and again [1].
+
+References
+[1] Smith J. Neural networks review. Nature 2021.

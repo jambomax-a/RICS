@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RICS — 引用整合性チェック</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>RICS</h1>
+    <p class="subtitle">Reference Integrity Check System</p>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section class="upload-zone" id="dropZone">
+        <p>本論文をドロップ</p>
+        <p class="hint">PDF / Word / テキスト</p>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt,.md,.tex,.rtf" hidden />
+        <button type="button" id="browseBtn" class="btn">ファイルを選択</button>
+      </section>
+      <section class="paper-list">
+        <h2>登録論文</h2>
+        <ul id="paperList"></ul>
+      </section>
+    </aside>
+
+    <section class="detail" id="detailPanel">
+      <p class="placeholder">左の一覧から論文を選ぶか、ファイルをアップロードしてください。</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <div id="busyOverlay" class="busy-overlay" hidden aria-hidden="true">
+    <div class="busy-dialog" role="alertdialog" aria-modal="true" aria-labelledby="busyTitle" aria-describedby="busyMessage">
+      <div class="busy-spinner" aria-hidden="true"></div>
+      <h2 id="busyTitle">処理中</h2>
+      <p id="busyMessage" class="busy-message">しばらくお待ちください…</p>
+      <div class="busy-progress-track" aria-hidden="true">
+        <div class="busy-progress-bar" id="busyProgressBar"></div>
+      </div>
+      <p id="busyStep" class="busy-step"></p>
+      <p class="busy-hint">完了するまで他の操作はできません</p>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
