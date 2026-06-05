@@ -2,21 +2,60 @@ import json
 import re
 import os
 import sys
+import threading
+import gc
 from backend.config import settings
 from backend.models import Verdict
 
 """
 Verifier Service (検証サービス)
 ローカルLLM (llama-cpp-python) を使用して、引用の整合性を意味的に判定します。
+一定時間（5分）使われないと自動的にVRAMを解放するエコモジュールです。
 """
 
 _llm = None
+_last_used_time = 0
+_lock = threading.Lock()
+_unload_timer = None
+
+
+def _unload_model():
+    """モデルをVRAMから解放します。"""
+    global _llm, _unload_timer
+    with _lock:
+        if _llm is not None:
+            print("\n" + "💤" * 15)
+            print("IDLE DETECTED: UNLOADING MODEL FROM VRAM...")
+            print("💤" * 15 + "\n")
+            # llama-cpp-pythonのインスタンスを削除
+            del _llm
+            _llm = None
+        _unload_timer = None
+        # ガベージコレクションを促す
+        gc.collect()
+
+
+def _reset_unload_timer():
+    """解放タイマーをリセット（延長）します。"""
+    global _unload_timer
+    with _lock:
+        if _unload_timer is not None:
+            _unload_timer.cancel()
+        
+        # 300秒（5分）間アクセスがなければアンロード
+        _unload_timer = threading.Timer(300.0, _unload_model)
+        _unload_timer.daemon = True
+        _unload_timer.start()
 
 
 def _get_llm():
     global _llm
+    # ロード済みならタイマーを回して返す
     if _llm is not None:
+        _reset_unload_timer()
         return _llm
+    
+    # ロードが必要な場合
     if not settings.llm_model_path:
         return None
 
@@ -66,6 +105,8 @@ def _get_llm():
         print("\n" + "🟢" * 20)
         print("✅ LOCAL LLM IS READY (GPU/CPU)")
         print("🟢" * 20 + "\n")
+        # 正常にロードされたらタイマー起動
+        _reset_unload_timer()
     except Exception as e:
         print("\n" + "❌" * 20)
         print(f"FAILED TO LOAD LLM: {e}")
