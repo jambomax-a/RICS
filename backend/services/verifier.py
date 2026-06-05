@@ -2,58 +2,21 @@ import json
 import re
 import os
 import sys
-import time
-import threading
 from backend.config import settings
 from backend.models import Verdict
 
 """
 Verifier Service (検証サービス)
 ローカルLLM (llama-cpp-python) を使用して、引用の整合性を意味的に判定します。
-一定時間（5分）使われないと自動的にVRAMを解放するエコモジュールです。
 """
 
 _llm = None
-_last_used_time = 0
-_lock = threading.Lock()
-_unload_timer = None
 
-def _unload_model():
-    """モデルをVRAMから解放します。"""
-    global _llm, _unload_timer
-    with _lock:
-        if _llm is not None:
-            print("\n" + "💤" * 15)
-            print("IDLE DETECTED: UNLOADING MODEL FROM VRAM...")
-            print("💤" * 15 + "\n")
-            # llama-cpp-pythonのインスタンスを削除
-            del _llm
-            _llm = None
-        _unload_timer = None
-        # ガベージコレクションを促す
-        import gc
-        gc.collect()
-
-def _reset_unload_timer():
-    """解放タイマーをリセット（延長）します。"""
-    global _unload_timer
-    with _lock:
-        if _unload_timer is not None:
-            _unload_timer.cancel()
-        
-        # 300秒（5分）間アクセスがなければアンロード
-        _unload_timer = threading.Timer(300.0, _unload_model)
-        _unload_timer.daemon = True
-        _unload_timer.start()
 
 def _get_llm():
     global _llm
-    with _lock:
-        if _llm is not None:
-            _reset_unload_timer()
-            return _llm
-        
-    # ロード開始
+    if _llm is not None:
+        return _llm
     if not settings.llm_model_path:
         return None
 
@@ -94,15 +57,12 @@ def _get_llm():
     print("★"*30)
     
     try:
-        new_llm = Llama(
+        _llm = Llama(
             model_path=settings.llm_model_path,
             n_ctx=settings.llm_n_ctx,
             n_gpu_layers=settings.llm_n_gpu_layers,
             verbose=False,
         )
-        with _lock:
-            _llm = new_llm
-            _reset_unload_timer()
         print("\n" + "🟢" * 20)
         print("✅ LOCAL LLM IS READY (GPU/CPU)")
         print("🟢" * 20 + "\n")
@@ -110,8 +70,7 @@ def _get_llm():
         print("\n" + "❌" * 20)
         print(f"FAILED TO LOAD LLM: {e}")
         print("❌" * 20 + "\n")
-        with _lock:
-            _llm = None
+        _llm = None
 
     return _llm
 
@@ -178,9 +137,6 @@ def verify_citation(
     source_meta: dict,
     manual_text: str | None = None,
 ) -> dict:
-    # 呼び出しのたびにタイマーを延長
-    _reset_unload_timer()
-    
     source_body = manual_text or source_meta.get("abstract") or ""
     title = source_meta.get("title") or ""
     authors = source_meta.get("authors") or ""
